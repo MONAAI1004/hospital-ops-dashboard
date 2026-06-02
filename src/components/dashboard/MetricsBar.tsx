@@ -9,8 +9,8 @@ import {
   Smile,
   Users,
 } from 'lucide-react'
-import { beds, wards } from '../../data/mockHospitalData'
-import type { Patient, Request } from '../../types/hospital'
+import { clearDashboardStorage } from '../../lib/dashboardStorage'
+import type { Bed, Patient, Request, Ward } from '../../types/hospital'
 import {
   calculateAvailableBeds,
   calculateAverageWaitTime,
@@ -19,12 +19,16 @@ import {
 
 interface MetricsBarProps {
   selectedWardId: string
+  wards: Ward[]
+  beds: Bed[]
   patients: Patient[]
   requests: Request[]
 }
 
 export default function MetricsBar({
   selectedWardId,
+  wards,
+  beds,
   patients,
   requests,
 }: MetricsBarProps) {
@@ -47,7 +51,7 @@ export default function MetricsBar({
   )
 
   const occupancy = calculateBedOccupancy(floorBeds)
-  const available = calculateAvailableBeds(floorBeds, [])
+  const available = calculateAvailableBeds(floorBeds, wards)
   const averageWaitMinutes = calculateAverageWaitTime(floorRequests)
 
   const openRequests = floorRequests
@@ -215,7 +219,7 @@ export default function MetricsBar({
       </div>
       <button
         onClick={() => {
-          localStorage.clear()
+          clearDashboardStorage()
           window.location.reload()
         }}
         className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"

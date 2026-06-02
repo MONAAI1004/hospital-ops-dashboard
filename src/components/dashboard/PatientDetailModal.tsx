@@ -58,7 +58,8 @@ export default function PatientDetailModal({
 
   if (!patient) return null
 
-  const currentDischargeIndex = dischargeFlow.indexOf(patient.dischargeState)
+  const activePatient = patient
+  const currentDischargeIndex = dischargeFlow.indexOf(activePatient.dischargeState)
 
   function handleClose() {
     setIsAddingRequest(false)
@@ -69,15 +70,15 @@ export default function PatientDetailModal({
   }
 
   const patientRequests = requests.filter(
-    (request) => request.patientId === patient.id && !request.resolved,
+    (request) => request.patientId === activePatient.id && !request.resolved,
   )
 
   function handleSubmitRequest(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault()
 
     onAddRequest({
-      patientId: patient.id,
-      roomNumber: patient.roomNumber,
+      patientId: activePatient.id,
+      roomNumber: activePatient.roomNumber,
       type: requestType,
       priority,
       description: description.trim() || formatLabel(requestType),

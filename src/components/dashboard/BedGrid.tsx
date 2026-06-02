@@ -1,12 +1,13 @@
 import { useMemo, useState } from 'react'
 import { BedDouble, ChevronDown } from 'lucide-react'
-import { beds, wards } from '../../data/mockHospitalData'
 import type {
+  Bed,
   Patient,
   PatientStatus,
   Request,
   RequestPriority,
   RequestType,
+  Ward,
 } from '../../types/hospital'
 import { calculateWardOccupancy } from '../../utils/dashboardMetrics'
 import PatientDetailModal from './PatientDetailModal'
@@ -36,6 +37,8 @@ const legendItems: PatientStatus[] = [
 
 interface BedGridProps {
   selectedWardId: string
+  wards: Ward[]
+  beds: Bed[]
   onSelectedWardChange: (wardId: string) => void
   patients: Patient[]
   requests: Request[]
@@ -59,6 +62,8 @@ function formatStatus(status: string) {
 
 export default function BedGrid({
   selectedWardId,
+  wards,
+  beds,
   onSelectedWardChange,
   patients,
   requests,
