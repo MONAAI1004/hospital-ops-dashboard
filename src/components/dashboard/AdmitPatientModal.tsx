@@ -30,7 +30,6 @@ interface AdmitPatientModalProps {
 
 export default function AdmitPatientModal({
   isOpen,
-  wards,
   beds,
   selectedWardId,
   preselectedBedId,
