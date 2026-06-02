@@ -363,7 +363,6 @@ export default function BedGrid({
 
       <AdmitPatientModal
         isOpen={showAdmitModal}
-        wards={wards}
         beds={beds}
         selectedWardId={selectedWardId}
         preselectedBedId={selectedBedId}

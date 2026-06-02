@@ -4,7 +4,6 @@ import type {
   Bed,
   PatientMood,
   PatientStatus,
-  Ward,
 } from '../../types/hospital'
 
 type AgeGroup = 'young' | 'adult' | 'elderly'
@@ -12,7 +11,6 @@ type Gender = 'male' | 'female'
 
 interface AdmitPatientModalProps {
   isOpen: boolean
-  wards: Ward[]
   beds: Bed[]
   selectedWardId: string
   preselectedBedId: string | null
