@@ -12,12 +12,22 @@ import {
   Sparkles,
 } from 'lucide-react'
 import type {
+  DischargeTask,
   Patient,
   Request,
   RequestPriority,
   RequestType,
 } from '../../types/hospital'
+import { isActiveRequest } from '../../types/hospital'
 import { formatRelativeTime } from '../../utils/dashboardMetrics'
+import {
+  getDischargeProgressSummary,
+  getDischargeTasksForPatient,
+} from '../../utils/dischargeWorkflow'
+import {
+  requestStatusLabels,
+  requestStatusStyles,
+} from '../../utils/requestWorkflow'
 
 const requestIcons: Record<RequestType, typeof Bell> = {
   pain_medication: Bell,
@@ -74,16 +84,20 @@ interface RequestPanelProps {
   selectedWardId: string
   patients: Patient[]
   requests: Request[]
+  dischargeTasks: DischargeTask[]
+  onAcknowledgeRequest: (requestId: string) => void
+  onStartWorkRequest: (requestId: string) => void
   onResolveRequest: (requestId: string) => void
-  onEscalateRequest: (requestId: string) => void
 }
 
 export default function RequestPanel({
   selectedWardId,
   patients,
   requests,
+  dischargeTasks,
+  onAcknowledgeRequest,
+  onStartWorkRequest,
   onResolveRequest,
-  onEscalateRequest,
 }: RequestPanelProps) {
   const floorPatients = patients.filter(
     (patient) => patient.wardId === selectedWardId,
@@ -100,7 +114,7 @@ export default function RequestPanel({
   const openRequests = requests
     .filter(
       (request) =>
-        !request.resolved && floorPatientIds.has(request.patientId),
+        isActiveRequest(request) && floorPatientIds.has(request.patientId),
     )
     .sort((a, b) => {
       const priorityWeight: Record<RequestPriority, number> = {
@@ -122,8 +136,24 @@ export default function RequestPanel({
   ).length
 
   const dischargePatients = floorPatients
-    .filter((patient) => patient.dischargeState !== 'not_started')
+    .filter((patient) => {
+      const tasks = getDischargeTasksForPatient(dischargeTasks, patient.id)
+
+      return (
+        patient.dischargeState !== 'not_started' ||
+        tasks.length > 0
+      )
+    })
     .sort((a, b) => {
+      const aTasks = getDischargeTasksForPatient(dischargeTasks, a.id)
+      const bTasks = getDischargeTasksForPatient(dischargeTasks, b.id)
+      const aSummary = getDischargeProgressSummary(aTasks)
+      const bSummary = getDischargeProgressSummary(bTasks)
+
+      if (aSummary.blockedCount !== bSummary.blockedCount) {
+        return bSummary.blockedCount - aSummary.blockedCount
+      }
+
       const priorityOrder: Record<string, number> = {
         transport_delayed: 0,
         pending_md: 1,
@@ -236,35 +266,56 @@ export default function RequestPanel({
                     {request.description || requestTypeLabels[request.type]}
                   </p>
 
-                  <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3">
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${
+                        requestStatusStyles[request.status]
+                      }`}
+                    >
+                      {requestStatusLabels[request.status]}
+                    </span>
+
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300">
+                      {request.assignedRole}
+                    </span>
+                  </div>
+
+                  <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 dark:border-slate-700">
                     <span className="flex items-center gap-1 text-xs text-slate-500 dark:text-slate-300">
                       <Clock className="size-3" />
                       {formatRelativeTime(request.createdAt)}
                     </span>
 
                     <div className="flex gap-1">
-                      <button
-                        type="button"
-                        className="rounded-md bg-violet-50 dark:bg-violet-900/10 px-2.5 py-1 text-xs font-medium text-violet-700 dark:text-violet-300 ring-1 ring-violet-100 dark:ring-violet-900 transition-colors hover:bg-violet-100 dark:hover:bg-violet-900/20"
-                      >
-                        Review
-                      </button>
+                      {request.status === 'open' && (
+                        <button
+                          type="button"
+                          onClick={() => onAcknowledgeRequest(request.id)}
+                          className="rounded-md bg-violet-50 dark:bg-violet-900/10 px-2.5 py-1 text-xs font-medium text-violet-700 dark:text-violet-300 ring-1 ring-violet-100 dark:ring-violet-900 transition-colors hover:bg-violet-100 dark:hover:bg-violet-900/20"
+                        >
+                          Acknowledge
+                        </button>
+                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => onResolveRequest(request.id)}
-                        className="rounded-md bg-green-50 dark:bg-green-900/10 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 ring-1 ring-green-100 dark:ring-green-900 transition-colors hover:bg-green-100 dark:hover:bg-green-900/20"
-                      >
-                        Resolve
-                      </button>
+                      {request.status === 'acknowledged' && (
+                        <button
+                          type="button"
+                          onClick={() => onStartWorkRequest(request.id)}
+                          className="rounded-md bg-blue-50 dark:bg-blue-900/10 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-300 ring-1 ring-blue-100 dark:ring-blue-900 transition-colors hover:bg-blue-100 dark:hover:bg-blue-900/20"
+                        >
+                          Start Work
+                        </button>
+                      )}
 
-                      <button
-                        type="button"
-                        onClick={() => onEscalateRequest(request.id)}
-                        className="rounded-md bg-red-50 dark:bg-red-900/10 px-2.5 py-1 text-xs font-medium text-red-700 dark:text-red-300 ring-1 ring-red-100 dark:ring-red-900 transition-colors hover:bg-red-100 dark:hover:bg-red-900/20"
-                      >
-                        Escalate
-                      </button>
+                      {request.status === 'in_progress' && (
+                        <button
+                          type="button"
+                          onClick={() => onResolveRequest(request.id)}
+                          className="rounded-md bg-green-50 dark:bg-green-900/10 px-2.5 py-1 text-xs font-medium text-green-700 dark:text-green-300 ring-1 ring-green-100 dark:ring-green-900 transition-colors hover:bg-green-100 dark:hover:bg-green-900/20"
+                        >
+                          Resolve
+                        </button>
+                      )}
                     </div>
                   </div>
                 </article>
@@ -298,9 +349,19 @@ export default function RequestPanel({
               </div>
             ) : (
               dischargePatients.map((patient) => {
+                const patientTasks = getDischargeTasksForPatient(
+                  dischargeTasks,
+                  patient.id,
+                )
+                const progress = getDischargeProgressSummary(patientTasks)
                 const isDelayed =
-                  patient.dischargeState === 'transport_delayed'
+                  patient.dischargeState === 'transport_delayed' ||
+                  progress.blockedCount > 0
                 const isComplete = patient.dischargeState === 'complete'
+                const progressLabel =
+                  patientTasks.length > 0
+                    ? progress.summaryLabel
+                    : dischargeStateLabels[patient.dischargeState]
 
                 return (
                   <div
@@ -320,7 +381,7 @@ export default function RequestPanel({
                           {patient.name}
                         </p>
                         <p className="mt-0.5 text-[11px] text-slate-500 dark:text-slate-300">
-                          {dischargeStateLabels[patient.dischargeState]}
+                          {progressLabel}
                         </p>
                       </div>
 

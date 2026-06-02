@@ -6,6 +6,7 @@ import type {
   PatientStatus,
   Request,
 } from '../types/hospital'
+import { isActiveRequest } from '../types/hospital'
 
 type PatientBedRow = {
   ward_id: string
@@ -45,7 +46,7 @@ function buildActiveRequestIds(requests: Request[]): Map<string, string[]> {
   const activeRequestIds = new Map<string, string[]>()
 
   for (const request of requests) {
-    if (request.resolved) {
+    if (!isActiveRequest(request)) {
       continue
     }
 
@@ -146,6 +147,50 @@ export async function updatePatient(
   const { error } = await getSupabaseClient()
     .from('patients')
     .update(payload)
+    .eq('id', patientId)
+
+  if (error) {
+    throw error
+  }
+}
+
+export async function createPatient(data: {
+  bedId: string
+  name: string
+  initials: string
+  ageGroup: 'young' | 'adult' | 'elderly'
+  gender: 'male' | 'female'
+  status: PatientStatus
+  mood: PatientMood
+}) {
+  const { data: createdPatient, error } = await getSupabaseClient()
+    .from('patients')
+    .insert({
+      bed_id: data.bedId,
+      name: data.name,
+      initials: data.initials,
+      age_group: data.ageGroup,
+      gender: data.gender,
+      los_days: 1,
+      status: data.status,
+      mood: data.mood,
+      satisfaction_score: 100,
+      discharge_state: 'not_started',
+    })
+    .select()
+    .single()
+
+  if (error) {
+    throw error
+  }
+
+  return createdPatient
+}
+
+export async function dischargePatient(patientId: string): Promise<void> {
+  const { error } = await getSupabaseClient()
+    .from('patients')
+    .delete()
     .eq('id', patientId)
 
   if (error) {

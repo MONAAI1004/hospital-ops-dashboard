@@ -9,8 +9,8 @@ import {
   Smile,
   Users,
 } from 'lucide-react'
-import { clearDashboardStorage } from '../../lib/dashboardStorage'
 import type { Bed, Patient, Request, Ward } from '../../types/hospital'
+import { isActiveRequest } from '../../types/hospital'
 import {
   calculateAvailableBeds,
   calculateAverageWaitTime,
@@ -47,7 +47,7 @@ export default function MetricsBar({
 
   const floorRequests = requests.filter(
     (request) =>
-      floorPatientIds.has(request.patientId) && !request.resolved,
+      floorPatientIds.has(request.patientId) && isActiveRequest(request),
   )
 
   const occupancy = calculateBedOccupancy(floorBeds)
@@ -87,14 +87,14 @@ export default function MetricsBar({
     {
       label: 'Hospital Mood',
       value: 'Good',
-      sub: 'Stable floor activity',
+      sub: 'calc mood...',
       icon: Smile,
       accent: 'text-violet-600',
     },
     {
       label: 'Avg. Response Time',
       value: `${averageWaitMinutes} min`,
-      sub: '↓ 6 min',
+      sub: '(calc change)',
       icon: Clock,
       accent: 'text-blue-600',
     },
@@ -217,15 +217,6 @@ export default function MetricsBar({
           </div>
         ))}
       </div>
-      <button
-        onClick={() => {
-          clearDashboardStorage()
-          window.location.reload()
-        }}
-        className="mt-4 rounded-lg bg-violet-600 px-4 py-2 text-sm font-medium text-white shadow-sm transition-colors hover:bg-violet-700"
-      >
-        Reset Demo Data
-      </button>
     </header>
   )
 }

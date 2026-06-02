@@ -3,20 +3,31 @@ import type {
   Patient,
   Request,
   RequestPriority,
+  RequestStatus,
   RequestType,
 } from '../types/hospital'
 
-type RequestRow = {
+export type RequestRow = {
   id: string
   patient_id: string
   type: RequestType
   priority: RequestPriority
+  status: RequestStatus
+  assigned_role: string
   description: string
   resolved: boolean
   created_at: string
 }
 
-function mapRequestRow(row: RequestRow, patientsById: Map<string, Patient>): Request {
+const REQUEST_SELECT =
+  'id, patient_id, type, priority, status, assigned_role, description, resolved, created_at'
+
+export { getAssignedRoleForRequestType } from '../utils/requestWorkflow'
+
+export function mapRequestRow(
+  row: RequestRow,
+  patientsById: Map<string, Patient>,
+): Request {
   const patient = patientsById.get(row.patient_id)
 
   return {
@@ -25,6 +36,8 @@ function mapRequestRow(row: RequestRow, patientsById: Map<string, Patient>): Req
     roomNumber: patient?.roomNumber ?? 0,
     type: row.type,
     priority: row.priority,
+    status: row.status,
+    assignedRole: row.assigned_role,
     description: row.description,
     resolved: row.resolved,
     createdAt: row.created_at,
@@ -36,7 +49,7 @@ export async function fetchRequests(patients: Patient[]): Promise<Request[]> {
 
   const { data, error } = await getSupabaseClient()
     .from('requests')
-    .select('id, patient_id, type, priority, description, resolved, created_at')
+    .select(REQUEST_SELECT)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -51,7 +64,7 @@ export async function fetchRequests(patients: Patient[]): Promise<Request[]> {
 export async function fetchRequestRows(): Promise<RequestRow[]> {
   const { data, error } = await getSupabaseClient()
     .from('requests')
-    .select('id, patient_id, type, priority, description, resolved, created_at')
+    .select(REQUEST_SELECT)
     .order('created_at', { ascending: false })
 
   if (error) {
@@ -75,9 +88,9 @@ export async function createRequest(input: {
       type: input.type,
       priority: input.priority,
       description: input.description,
-      resolved: false,
+      status: 'open',
     })
-    .select('id, patient_id, type, priority, description, resolved, created_at')
+    .select(REQUEST_SELECT)
     .single()
 
   if (error) {
@@ -90,16 +103,21 @@ export async function createRequest(input: {
     roomNumber: input.roomNumber,
     type: data.type,
     priority: data.priority,
+    status: data.status,
+    assignedRole: data.assigned_role,
     description: data.description,
     resolved: data.resolved,
     createdAt: data.created_at,
   }
 }
 
-export async function resolveRequest(requestId: string): Promise<void> {
+async function updateRequestStatus(
+  requestId: string,
+  status: RequestStatus,
+): Promise<void> {
   const { error } = await getSupabaseClient()
     .from('requests')
-    .update({ resolved: true })
+    .update({ status })
     .eq('id', requestId)
 
   if (error) {
@@ -107,21 +125,14 @@ export async function resolveRequest(requestId: string): Promise<void> {
   }
 }
 
-export async function escalateRequest(
-  requestId: string,
-  currentPriority: RequestPriority,
-): Promise<RequestPriority> {
-  const nextPriority: RequestPriority =
-    currentPriority === 'low' ? 'normal' : 'urgent'
+export async function acknowledgeRequest(requestId: string): Promise<void> {
+  await updateRequestStatus(requestId, 'acknowledged')
+}
 
-  const { error } = await getSupabaseClient()
-    .from('requests')
-    .update({ priority: nextPriority })
-    .eq('id', requestId)
+export async function startWorkRequest(requestId: string): Promise<void> {
+  await updateRequestStatus(requestId, 'in_progress')
+}
 
-  if (error) {
-    throw error
-  }
-
-  return nextPriority
+export async function resolveRequest(requestId: string): Promise<void> {
+  await updateRequestStatus(requestId, 'resolved')
 }

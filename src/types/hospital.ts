@@ -1,5 +1,11 @@
 export type RequestPriority = 'urgent' | 'normal' | 'low'
 
+export type RequestStatus =
+  | 'open'
+  | 'acknowledged'
+  | 'in_progress'
+  | 'resolved'
+
 export type BedStatus = 'available' | 'occupied' | 'reserved' | 'cleaning'
 
 export type PatientStatus =
@@ -31,6 +37,24 @@ export type DischargeState =
   | 'medication_ready'
   | 'transport_delayed'
   | 'complete'
+
+export type DischargeTaskStatus =
+  | 'pending'
+  | 'in_progress'
+  | 'complete'
+  | 'blocked'
+
+export interface DischargeTask {
+  id: string
+  patientId: string
+  taskType: string
+  label: string
+  assignedRole: string
+  status: DischargeTaskStatus
+  completedAt: string | null
+  createdAt: string
+  updatedAt: string
+}
 
 export type RequestType =
   | 'pain_medication'
@@ -80,9 +104,15 @@ export interface Request {
   patientId: string
   roomNumber: number
   priority: RequestPriority
+  status: RequestStatus
+  assignedRole: string
   createdAt: string
   description: string
   resolved: boolean
+}
+
+export function isActiveRequest(request: Request): boolean {
+  return request.status !== 'resolved'
 }
 
 export interface ShiftInfo {

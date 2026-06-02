@@ -1,9 +1,5 @@
-import type {
-  Bed,
-  Request,
-  RequestPriority,
-  Ward,
-} from '../types/hospital'
+import type { Bed, Request, RequestPriority, Ward } from '../types/hospital'
+import { isActiveRequest } from '../types/hospital'
 
 export interface BedOccupancyResult {
   percentage: number
@@ -75,7 +71,7 @@ export function calculateAvailableBeds(
 export function calculatePendingRequests(
   requests: Request[],
 ): PendingRequestsResult {
-  const openRequests = requests.filter((request) => !request.resolved)
+  const openRequests = requests.filter((request) => isActiveRequest(request))
 
   return {
     total: openRequests.length,

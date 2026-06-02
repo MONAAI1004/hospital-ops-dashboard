@@ -2,6 +2,8 @@ import { useMemo, useState } from 'react'
 import { BedDouble, ChevronDown } from 'lucide-react'
 import type {
   Bed,
+  DischargeTask,
+  DischargeTaskStatus,
   Patient,
   PatientStatus,
   Request,
@@ -11,6 +13,7 @@ import type {
 } from '../../types/hospital'
 import { calculateWardOccupancy } from '../../utils/dashboardMetrics'
 import PatientDetailModal from './PatientDetailModal'
+import AdmitPatientModal from './AdmitPatientModal'
 
 const patientStatusStyles: Record<PatientStatus, string> = {
   stable: 'bg-green-50 dark:bg-green-900/10 text-green-700 dark:text-green-300 ring-green-200 dark:ring-green-800',
@@ -42,6 +45,7 @@ interface BedGridProps {
   onSelectedWardChange: (wardId: string) => void
   patients: Patient[]
   requests: Request[]
+  dischargeTasks: DischargeTask[]
   onPatientUpdate: (
     patientId: string,
     updates: Partial<Patient>,
@@ -54,6 +58,22 @@ interface BedGridProps {
     priority: RequestPriority
     description: string
   }) => void
+  onDischargeTaskUpdate: (
+    taskId: string,
+    status: DischargeTaskStatus,
+  ) => void
+  onStartDischargeWorkflow: (patientId: string) => void
+
+  onAdmitPatient: (patient: {
+    bedId: string
+    name: string
+    initials: string
+    ageGroup: 'young' | 'adult' | 'elderly'
+    gender: 'male' | 'female'
+    status: PatientStatus
+    mood: 'calm' | 'waiting' | 'frustrated' | 'sleeping' | 'anxious'
+  }) => void
+  onDischargePatient: (patientId: string) => void
 }
 
 function formatStatus(status: string) {
@@ -64,13 +84,20 @@ export default function BedGrid({
   selectedWardId,
   wards,
   beds,
+  onAdmitPatient,
   onSelectedWardChange,
   patients,
   requests,
+  dischargeTasks,
   onPatientUpdate,
   onAddRequest,
+  onDischargeTaskUpdate,
+  onStartDischargeWorkflow,
+  onDischargePatient,
 }: BedGridProps) {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
+  const [showAdmitModal, setShowAdmitModal] = useState(false)
+  const [selectedBedId, setSelectedBedId] = useState<string | null>(null)
   
   const [activeFilter, setActiveFilter] = useState<
     'all' | 'high_risk' | 'discharge_ready' | 'los_5' | 'open_requests'
@@ -151,7 +178,7 @@ export default function BedGrid({
           </p>
         </div>
 
-        <div className="flex min-w-0 flex-nowrap items-center gap-4 overflow-x-auto text-xs">
+        <div className="flex min-w-0 flex-wrap items-center justify-end gap-x-4 gap-y-2 text-xs">
           {legendItems.map((status) => (
             <span
               key={status}
@@ -209,27 +236,38 @@ export default function BedGrid({
                 {occupancy.occupied}/{occupancy.total} occupied
               </span>
 
-              <select
-                value={activeFilter}
-                onChange={(event) =>
-                  setActiveFilter(
-                    event.target.value as
-                      | 'all'
-                      | 'high_risk'
-                      | 'discharge_ready'
-                      | 'los_5'
-                      | 'open_requests',
-                  )
-                }
-                className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedBedId(null)
+                  setShowAdmitModal(true)
+                }}
+                className="rounded-lg bg-violet-600 px-3 py-1 text-sm font-medium text-white hover:bg-violet-700"
               >
-                <option value="all">All patients</option>
-                <option value="high_risk">High risk only</option>
-                <option value="discharge_ready">Discharge ready</option>
-                <option value="los_5">LOS 5+ days</option>
-                <option value="open_requests">Open requests</option>
-              </select>
+                + Admit Patient
+              </button>
             </div>
+          
+            <select
+              value={activeFilter}
+              onChange={(event) =>
+                setActiveFilter(
+                  event.target.value as
+                    | 'all'
+                    | 'high_risk'
+                    | 'discharge_ready'
+                    | 'los_5'
+                    | 'open_requests',
+                )
+              }
+              className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 px-3 py-1.5 text-sm font-medium text-slate-700 shadow-sm outline-none transition focus:border-violet-300 focus:ring-4 focus:ring-violet-100"
+            >
+              <option value="all">All patients</option>
+              <option value="high_risk">High risk only</option>
+              <option value="discharge_ready">Discharge ready</option>
+              <option value="los_5">LOS 5+ days</option>
+              <option value="open_requests">Open requests</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-[repeat(auto-fit,minmax(120px,1fr))] gap-3">
@@ -282,7 +320,15 @@ export default function BedGrid({
                   </div>
                 </button>
               ) : (
-                <div key={bed.id} className={cardClasses}>
+                <button
+                  key={bed.id}
+                  type="button"
+                  onClick={() => {
+                    setSelectedBedId(bed.id)
+                    setShowAdmitModal(true)
+                  }}
+                  className={cardClasses}
+                >
                   <div className="mb-2 flex items-center justify-between">
                     <span className="text-sm font-bold text-slate-900 dark:text-slate-100">
                       {bed.label}
@@ -296,7 +342,7 @@ export default function BedGrid({
                   <div className="flex h-24 items-center justify-center text-xs text-slate-400">
                     Empty
                   </div>
-                </div>
+                </button>
               )
             })}
           </div>
@@ -306,9 +352,30 @@ export default function BedGrid({
       <PatientDetailModal
         patient={selectedPatient}
         requests={requests}
+        dischargeTasks={dischargeTasks}
         onClose={() => setSelectedPatientId(null)}
         onPatientUpdate={onPatientUpdate}
         onAddRequest={onAddRequest}
+        onDischargeTaskUpdate={onDischargeTaskUpdate}
+        onStartDischargeWorkflow={onStartDischargeWorkflow} 
+        onDischargePatient={onDischargePatient}
+      />
+
+      <AdmitPatientModal
+        isOpen={showAdmitModal}
+        wards={wards}
+        beds={beds}
+        selectedWardId={selectedWardId}
+        preselectedBedId={selectedBedId}
+        onClose={() => {
+          setShowAdmitModal(false)
+          setSelectedBedId(null)
+        }}
+        onAdmitPatient={(patient) => {
+          onAdmitPatient(patient)
+          setShowAdmitModal(false)
+          setSelectedBedId(null)
+        }}
       />
     </main>
   )
