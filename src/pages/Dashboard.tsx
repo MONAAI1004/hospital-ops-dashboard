@@ -49,6 +49,7 @@ import {
   computeDischargeStateFromTasks,
 } from '../utils/dischargeWorkflow'
 import SettingsPage from './SettingsPage'
+import MessagesPage from './MessagesPage'
 
 function getFallbackSnapshot(): DashboardSnapshot {
   return {
@@ -133,7 +134,7 @@ export default function Dashboard() {
   )
   const [usingSupabase, setUsingSupabase] = useState(false)
 
-  const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>(
+  const [currentView, setCurrentView] = useState<'dashboard' | 'settings' | 'messages'>(
     'dashboard',
   )
 
@@ -612,6 +613,8 @@ export default function Dashboard() {
       <div className="ml-20 h-full">
       {currentView === 'settings' ? (
         <SettingsPage />
+      ) : currentView === 'messages' ? (
+        <MessagesPage patients={patients} />
       ) : (
         <>
           <MetricsBar

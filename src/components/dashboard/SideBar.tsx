@@ -4,6 +4,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   LogOut,
+  MessageCircle,
   Moon,
   Settings,
   Stethoscope,
@@ -15,9 +16,11 @@ import { useTheme } from '../../context/ThemeContext'
 import { getSupabaseClient } from '../../lib/supabaseClient'
 import { useEffect, useState } from 'react'
 import { fetchCurrentProfile, type Profile } from '../../services/profiles'
+import { fetchTotalUnreadPatientMessageCount } from '../../services/patientMessages'
 
 const navItems = [
   { label: 'Overview', icon: LayoutDashboard, active: true, view: 'dashboard' },
+  { label: 'CareConnect', icon: MessageCircle, active: false, view: 'messages' },
   { label: 'Patients', icon: BedDouble, active: false },
   { label: 'Admissions', icon: Users, active: false },
   { label: 'Requests', icon: ClipboardList, active: false },
@@ -25,19 +28,37 @@ const navItems = [
   { label: 'Analytics', icon: Activity, active: false },
 ]
 
+type ViewType = 'dashboard' | 'settings' | 'messages'
+
 interface SideBarProps {
-  currentView: 'dashboard' | 'settings'
-  onViewChange: (view: 'dashboard' | 'settings') => void
+  currentView: ViewType
+  onViewChange: (view: ViewType) => void
 }
 
 export default function SideBar({ currentView, onViewChange }: SideBarProps) {
   const { theme, setTheme } = useTheme()
   const [profile, setProfile] = useState<Profile | null>(null)
-
+  const [unreadMessageCount, setUnreadMessageCount] = useState(0)
   useEffect(() => {
     fetchCurrentProfile()
       .then(setProfile)
       .catch(console.error)
+  }, [])
+
+  useEffect(() => {
+    fetchTotalUnreadPatientMessageCount()
+      .then(setUnreadMessageCount)
+      .catch(console.error)
+  }, [currentView])
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchTotalUnreadPatientMessageCount()
+        .then(setUnreadMessageCount)
+        .catch(console.error)
+    }, 2000)
+  
+    return () => clearInterval(interval)
   }, [])
 
   return (
@@ -70,16 +91,24 @@ export default function SideBar({ currentView, onViewChange }: SideBarProps) {
               title={item.label}
               onClick={() => onViewChange(item.view as 'dashboard')}
               className={`flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left text-sm transition-colors ${
-                currentView === item.view && item.label === 'Overview' && item.active
+                currentView === item.view
                   ? 'bg-violet-50 font-semibold text-violet-700 ring-1 ring-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/20'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100'
               }`}
             >
               <item.icon className="size-5 shrink-0" strokeWidth={2} />
 
-              <span className="overflow-hidden text-ellipsis whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                {item.label}
-              </span>
+              <div className="flex min-w-0 flex-1 items-center">
+                <span className="overflow-hidden text-ellipsis whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                  {item.label}
+                </span>
+
+                {item.label === 'CareConnect' && unreadMessageCount > 0 && (
+                  <span className="ml-auto rounded-full bg-red-500 px-2 py-0.5 text-xs font-semibold text-white opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                    {unreadMessageCount}
+                  </span>
+                )}
+              </div>
             </button>
           ))}
         </div>
