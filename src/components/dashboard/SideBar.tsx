@@ -12,9 +12,12 @@ import {
 } from 'lucide-react'
 import { shiftInfo } from '../../data/mockHospitalData'
 import { useTheme } from '../../context/ThemeContext'
+import { getSupabaseClient } from '../../lib/supabaseClient'
+import { useEffect, useState } from 'react'
+import { fetchCurrentProfile, type Profile } from '../../services/profiles'
 
 const navItems = [
-  { label: 'Overview', icon: LayoutDashboard, active: true },
+  { label: 'Overview', icon: LayoutDashboard, active: true, view: 'dashboard' },
   { label: 'Patients', icon: BedDouble, active: false },
   { label: 'Admissions', icon: Users, active: false },
   { label: 'Requests', icon: ClipboardList, active: false },
@@ -22,8 +25,20 @@ const navItems = [
   { label: 'Analytics', icon: Activity, active: false },
 ]
 
-export default function SideBar() {
+interface SideBarProps {
+  currentView: 'dashboard' | 'settings'
+  onViewChange: (view: 'dashboard' | 'settings') => void
+}
+
+export default function SideBar({ currentView, onViewChange }: SideBarProps) {
   const { theme, setTheme } = useTheme()
+  const [profile, setProfile] = useState<Profile | null>(null)
+
+  useEffect(() => {
+    fetchCurrentProfile()
+      .then(setProfile)
+      .catch(console.error)
+  }, [])
 
   return (
     <aside className="group fixed left-0 top-0 z-50 flex h-screen w-20 flex-col overflow-hidden border-r border-slate-200 bg-white shadow-sm transition-[width,box-shadow] duration-300 hover:w-72 hover:shadow-xl dark:border-slate-800 dark:bg-slate-950">
@@ -34,10 +49,10 @@ export default function SideBar() {
 
         <div className="min-w-0 overflow-hidden opacity-0 transition-opacity duration-200 group-hover:opacity-100">
           <h1 className="whitespace-nowrap text-sm font-bold tracking-tight text-slate-900 dark:text-slate-100">
-            {shiftInfo.brandName}
+            {profile?.brandName ?? shiftInfo.brandName}
           </h1>
           <p className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">
-            {shiftInfo.hospitalName}
+            {profile?.hospitalName ?? shiftInfo.hospitalName}
           </p>
         </div>
       </div>
@@ -53,8 +68,9 @@ export default function SideBar() {
               key={item.label}
               type="button"
               title={item.label}
+              onClick={() => onViewChange(item.view as 'dashboard')}
               className={`flex w-full items-center gap-4 rounded-xl px-3 py-3 text-left text-sm transition-colors ${
-                item.active
+                currentView === item.view && item.label === 'Overview' && item.active
                   ? 'bg-violet-50 font-semibold text-violet-700 ring-1 ring-violet-100 dark:bg-violet-500/15 dark:text-violet-300 dark:ring-violet-500/20'
                   : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100'
               }`}
@@ -73,7 +89,12 @@ export default function SideBar() {
         <button
           type="button"
           title="Settings"
-          className="flex w-full items-center gap-4 rounded-xl px-3 py-3 text-sm text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
+          onClick={() => onViewChange('settings')}
+          className={`flex w-full items-center gap-4 rounded-xl px-3 py-3 text-sm transition-colors ${
+            currentView === 'settings'
+              ? 'bg-violet-50 font-semibold text-violet-700'
+              : 'text-slate-500 hover:bg-slate-50 hover:text-slate-900'
+          }`}
         >
           <Settings className="size-5 shrink-0" strokeWidth={2} />
           <span className="overflow-hidden text-ellipsis whitespace-nowrap opacity-0 transition-opacity duration-200 group-hover:opacity-100">
@@ -88,11 +109,11 @@ export default function SideBar() {
 
           <div className="mt-1 overflow-x-auto whitespace-nowrap">
             <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">
-              {shiftInfo.shiftLead}
+              {profile?.displayName ?? shiftInfo.shiftLead}
             </p>
 
             <p className="text-xs text-slate-500 dark:text-slate-400">
-              {shiftInfo.shiftDescription}
+              {profile?.roleTitle ?? shiftInfo.shiftDescription}
             </p>
           </div>
         </div>
@@ -126,6 +147,9 @@ export default function SideBar() {
         <button
           type="button"
           title="Sign out"
+          onClick={async () => {
+            await getSupabaseClient().auth.signOut()
+          }}
           className="mt-3 flex w-full items-center gap-4 rounded-xl px-3 py-3 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-900 dark:hover:text-slate-100"
         >
           <LogOut className="size-5 shrink-0" strokeWidth={2} />

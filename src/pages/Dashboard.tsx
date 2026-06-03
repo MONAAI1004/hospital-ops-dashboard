@@ -48,6 +48,7 @@ import {
   buildDefaultDischargeTasks,
   computeDischargeStateFromTasks,
 } from '../utils/dischargeWorkflow'
+import SettingsPage from './SettingsPage'
 
 function getFallbackSnapshot(): DashboardSnapshot {
   return {
@@ -131,6 +132,10 @@ export default function Dashboard() {
     initialSnapshot.dischargeTasks,
   )
   const [usingSupabase, setUsingSupabase] = useState(false)
+
+  const [currentView, setCurrentView] = useState<'dashboard' | 'settings'>(
+    'dashboard',
+  )
 
   useEffect(() => {
     saveSelectedWardId(selectedWardId)
@@ -600,47 +605,52 @@ export default function Dashboard() {
       console.error('Failed to resolve request in Supabase:', error)
     }
   }
-
+  
   return (
     <div className="relative h-screen overflow-hidden bg-slate-50 dark:bg-slate-950">
-      <SideBar />
-
-      <div className="flex h-full min-w-0 flex-col pl-20">
-        <MetricsBar
-          selectedWardId={selectedWardId}
-          wards={wards}
-          beds={beds}
-          patients={patients}
-          requests={requests}
-        />
-
-        <div className="flex min-h-0 flex-1">
-          <BedGrid
+      <SideBar currentView={currentView} onViewChange={setCurrentView} />
+      <div className="ml-20 h-full">
+      {currentView === 'settings' ? (
+        <SettingsPage />
+      ) : (
+        <>
+          <MetricsBar
             selectedWardId={selectedWardId}
             wards={wards}
             beds={beds}
-            onSelectedWardChange={setSelectedWardId}
             patients={patients}
             requests={requests}
-            dischargeTasks={dischargeTasks}
-            onPatientUpdate={handlePatientUpdate}
-            onAddRequest={handleAddRequest}
-            onDischargeTaskUpdate={handleDischargeTaskUpdate}
-            onStartDischargeWorkflow={handleStartDischargeWorkflow}
-            onAdmitPatient={handleAdmitPatient}
-            onDischargePatient={handleDischargePatient}
           />
 
-          <RequestPanel
-            selectedWardId={selectedWardId}
-            patients={patients}
-            requests={requests}
-            dischargeTasks={dischargeTasks}
-            onAcknowledgeRequest={handleAcknowledgeRequest}
-            onStartWorkRequest={handleStartWorkRequest}
-            onResolveRequest={handleResolveRequest}
-          />
-        </div>
+          <div className="flex min-h-0 flex-1">
+            <BedGrid
+              selectedWardId={selectedWardId}
+              wards={wards}
+              beds={beds}
+              onSelectedWardChange={setSelectedWardId}
+              patients={patients}
+              requests={requests}
+              dischargeTasks={dischargeTasks}
+              onPatientUpdate={handlePatientUpdate}
+              onAddRequest={handleAddRequest}
+              onDischargeTaskUpdate={handleDischargeTaskUpdate}
+              onStartDischargeWorkflow={handleStartDischargeWorkflow}
+              onAdmitPatient={handleAdmitPatient}
+              onDischargePatient={handleDischargePatient}
+            />
+
+            <RequestPanel
+              selectedWardId={selectedWardId}
+              patients={patients}
+              requests={requests}
+              dischargeTasks={dischargeTasks}
+              onAcknowledgeRequest={handleAcknowledgeRequest}
+              onStartWorkRequest={handleStartWorkRequest}
+              onResolveRequest={handleResolveRequest}
+            />
+          </div>
+        </>
+      )}
       </div>
     </div>
   )

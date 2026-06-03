@@ -16,6 +16,8 @@ import {
   calculateAverageWaitTime,
   calculateBedOccupancy,
 } from '../../utils/dashboardMetrics'
+import { useEffect, useState } from 'react'
+import { fetchCurrentProfile, type Profile } from '../../services/profiles'
 
 interface MetricsBarProps {
   selectedWardId: string
@@ -32,6 +34,14 @@ export default function MetricsBar({
   patients,
   requests,
 }: MetricsBarProps) {
+  const [profile, setProfile] = useState<Profile | null>(null)
+
+  useEffect(() => {
+    fetchCurrentProfile()
+      .then(setProfile)
+      .catch(console.error)
+  }, [])
+  const firstName = profile?.displayName?.split(' ')[0] ?? 'User'
   const currentWard =
     wards.find((ward) => ward.id === selectedWardId) ?? wards[0]
 
@@ -159,7 +169,7 @@ export default function MetricsBar({
       <div className="mb-4 flex items-center justify-between gap-6">
         <div className="min-w-0">
           <h1 className="truncate text-xl font-bold text-slate-900 dark:text-slate-100">
-            Good morning, Emily! ☀️
+            Good morning, {firstName ?? 'User'}! ☀️
           </h1>
           <p className="mt-1 truncate text-sm text-slate-500 dark:text-slate-400">
             Here&apos;s what&apos;s happening on {currentWard.name} today.
