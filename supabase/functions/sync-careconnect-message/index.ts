@@ -26,6 +26,7 @@ Deno.serve(async (req) => {
   const careconnectUrl = Deno.env.get('CARECONNECT_SUPABASE_URL')
   const careconnectServiceKey = Deno.env.get('CARECONNECT_SUPABASE_SERVICE_ROLE_KEY')
   const syncSecret = Deno.env.get('SYNC_SECRET')
+  const careconnectApiBase = Deno.env.get('CARECONNECT_API_BASE')
 
   if (
     !hospitalUrl ||
@@ -82,11 +83,13 @@ Deno.serve(async (req) => {
       })
       .eq('id', outbox.id)
 
-    const result = await syncOneMessage({
-      hospital,
-      careconnect,
-      outbox,
-    })
+      const result = await syncOneMessage({
+        hospital,
+        careconnect,
+        outbox,
+        syncSecret,
+        careconnectApiBase,
+      })
 
     results.push(result)
   }
@@ -102,10 +105,14 @@ async function syncOneMessage({
   hospital,
   careconnect,
   outbox,
+  syncSecret,
+  careconnectApiBase,
 }: {
   hospital: ReturnType<typeof createClient>
   careconnect: ReturnType<typeof createClient>
   outbox: OutboxRow
+  syncSecret: string
+  careconnectApiBase: string | undefined
 }) {
   try {
     const { data: message, error: messageError } = await hospital
@@ -164,7 +171,7 @@ async function syncOneMessage({
 
     const careconnectMessageId = crypto.randomUUID()
 
-    const { error: insertError } = await careconnect
+    const { data: insertedMessage, error: insertError } = await careconnect
       .from('patient_messages')
       .insert({
         mongo_object_id: careconnectMessageId,
@@ -183,9 +190,38 @@ async function syncOneMessage({
           hospital_patient_id: hospitalMessage.patient_id,
         },
       })
+      .select()
+      .single()
 
     if (insertError) {
       throw new Error(insertError.message)
+    }
+
+    if (careconnectApiBase && insertedMessage) {
+      await fetch(
+        `${careconnectApiBase}/api/internal/realtime/message-created`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-sync-secret': syncSecret,
+          },
+          body: JSON.stringify({
+            message: {
+              id: insertedMessage.message_id ?? insertedMessage.mongo_object_id,
+              patientId: insertedMessage.patient_id,
+              senderRole: insertedMessage.sender_role,
+              senderUserId: insertedMessage.sender_user_id,
+              senderName: insertedMessage.sender_name,
+              body: insertedMessage.body,
+              createdAt: insertedMessage.created_at,
+              updatedAt: insertedMessage.updated_at,
+              readAt: insertedMessage.read_at,
+              status: insertedMessage.status,
+            },
+          }),
+        },
+      )
     }
 
     await hospital.from('careconnect_message_map').insert({
